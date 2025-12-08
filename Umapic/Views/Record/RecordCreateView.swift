@@ -10,8 +10,8 @@ struct RecordCreateView: View {
 
     let onSave: ((Bool) -> Void)?  // isEditing を渡す
 
-    init(editingRecord: Record? = nil, initialImage: UIImage? = nil, onSave: ((Bool) -> Void)? = nil) {
-        _viewModel = StateObject(wrappedValue: RecordCreateViewModel(editingRecord: editingRecord, initialImage: initialImage))
+    init(editingRecord: Record? = nil, initialImage: UIImage? = nil, initialPlace: Place? = nil, onSave: ((Bool) -> Void)? = nil) {
+        _viewModel = StateObject(wrappedValue: RecordCreateViewModel(editingRecord: editingRecord, initialImage: initialImage, initialPlace: initialPlace))
         self.onSave = onSave
     }
 

@@ -77,7 +77,7 @@ final class RecordCreateViewModel: ObservableObject {
         }
     }
 
-    init(editingRecord: Record? = nil, initialImage: UIImage? = nil) {
+    init(editingRecord: Record? = nil, initialImage: UIImage? = nil, initialPlace: Place? = nil) {
         self.editingRecord = editingRecord
         self.initialImage = initialImage
         self.saveToCameraRoll = UserDefaults.standard.bool(forKey: "saveToCameraRoll")
@@ -97,6 +97,13 @@ final class RecordCreateViewModel: ObservableObject {
             rating = record.rating
             note = record.note ?? ""
             companions = record.companions
+        } else if let place = initialPlace {
+            // 新規作成で場所が指定されている場合
+            storeName = place.name
+            placeId = place.placeId
+            latitude = place.latitude
+            longitude = place.longitude
+            address = place.address
         }
     }
 
