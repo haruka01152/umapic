@@ -1,17 +1,13 @@
-//
-//  UmapicApp.swift
-//  Umapic
-//
-//  Created by 奥山春夏 on 2025/12/05.
-//
-
 import SwiftUI
 
 @main
 struct UmapicApp: App {
+    @StateObject private var appState = AppState()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(appState)
         }
     }
 }
