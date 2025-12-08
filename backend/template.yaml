@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Umapic Backend API
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: umapic-restaurant-records
+        BUCKET_NAME: !Sub umapic-photos-${AWS::AccountId}
+
+Resources:
+  # API Gateway
+  UmapicApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: v1
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-User-ID'"
+        AllowOrigin: "'*'"
+
+  # Lambda Functions
+  ListRecordsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/
+      Handler: records.listRecords
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: umapic-restaurant-records
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UmapicApi
+            Path: /records
+            Method: GET
+
+  CreateRecordFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/
+      Handler: records.createRecord
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: umapic-restaurant-records
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UmapicApi
+            Path: /records
+            Method: POST
+
+  GetRecordFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/
+      Handler: records.getRecord
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: umapic-restaurant-records
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UmapicApi
+            Path: /records/{recordId}
+            Method: GET
+
+  UpdateRecordFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/
+      Handler: records.updateRecord
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: umapic-restaurant-records
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UmapicApi
+            Path: /records/{recordId}
+            Method: PUT
+
+  DeleteRecordFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/
+      Handler: records.deleteRecord
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: umapic-restaurant-records
+        - S3CrudPolicy:
+            BucketName: !Sub umapic-photos-${AWS::AccountId}
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UmapicApi
+            Path: /records/{recordId}
+            Method: DELETE
+
+  GetUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/
+      Handler: s3.getUploadUrl
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Sub umapic-photos-${AWS::AccountId}
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref UmapicApi
+            Path: /s3-upload-url
+            Method: GET
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${UmapicApi}.execute-api.${AWS::Region}.amazonaws.com/v1
