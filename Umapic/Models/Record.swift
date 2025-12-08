@@ -10,7 +10,6 @@ struct Record: Identifiable, Codable, Equatable, Hashable {
         lhs.id == rhs.id
     }
     let id: String
-    let userId: String
     let storeName: String
     let placeId: String?
     let latitude: Double
@@ -20,9 +19,10 @@ struct Record: Identifiable, Codable, Equatable, Hashable {
     let rating: Double
     let note: String?
     let companions: [String]
-    let photoKeys: [String]
+    let thumbnailUrl: String?  // リスト取得時
+    let photos: [Photo]?       // 詳細取得時
     let createdAt: Date
-    let updatedAt: Date
+    let updatedAt: Date?
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -30,7 +30,6 @@ struct Record: Identifiable, Codable, Equatable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id = "recordId"
-        case userId
         case storeName
         case placeId
         case latitude
@@ -40,10 +39,16 @@ struct Record: Identifiable, Codable, Equatable, Hashable {
         case rating
         case note
         case companions
-        case photoKeys
+        case thumbnailUrl
+        case photos
         case createdAt
         case updatedAt
     }
+}
+
+struct Photo: Codable, Equatable {
+    let originalUrl: String
+    let thumbnailUrl: String
 }
 
 extension Record {
@@ -53,11 +58,16 @@ extension Record {
         return formatter
     }()
 
+    static let simpleDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         id = try container.decode(String.self, forKey: .id)
-        userId = try container.decode(String.self, forKey: .userId)
         storeName = try container.decode(String.self, forKey: .storeName)
         placeId = try container.decodeIfPresent(String.self, forKey: .placeId)
         latitude = try container.decode(Double.self, forKey: .latitude)
@@ -66,24 +76,26 @@ extension Record {
         rating = try container.decode(Double.self, forKey: .rating)
         note = try container.decodeIfPresent(String.self, forKey: .note)
         companions = try container.decodeIfPresent([String].self, forKey: .companions) ?? []
-        photoKeys = try container.decodeIfPresent([String].self, forKey: .photoKeys) ?? []
+        thumbnailUrl = try container.decodeIfPresent(String.self, forKey: .thumbnailUrl)
+        photos = try container.decodeIfPresent([Photo].self, forKey: .photos)
 
         // 日付のデコード
         let visitDateString = try container.decode(String.self, forKey: .visitDate)
         let createdAtString = try container.decode(String.self, forKey: .createdAt)
-        let updatedAtString = try container.decode(String.self, forKey: .updatedAt)
+        let updatedAtString = try container.decodeIfPresent(String.self, forKey: .updatedAt)
 
         if let date = Self.dateFormatter.date(from: visitDateString) {
             visitDate = date
         } else {
-            // YYYY-MM-DD形式の場合
-            let simpleFormatter = DateFormatter()
-            simpleFormatter.dateFormat = "yyyy-MM-dd"
-            visitDate = simpleFormatter.date(from: visitDateString) ?? Date()
+            visitDate = Self.simpleDateFormatter.date(from: visitDateString) ?? Date()
         }
 
         createdAt = Self.dateFormatter.date(from: createdAtString) ?? Date()
-        updatedAt = Self.dateFormatter.date(from: updatedAtString) ?? Date()
+        if let updatedAtString = updatedAtString {
+            updatedAt = Self.dateFormatter.date(from: updatedAtString)
+        } else {
+            updatedAt = nil
+        }
     }
 }
 
@@ -92,7 +104,6 @@ extension Record {
     static let mockRecords: [Record] = [
         Record(
             id: "rec001",
-            userId: "user001",
             storeName: "ラーメン二郎 渋谷店",
             placeId: "ChIJN1t_tDeuEmsRUsoyG83frY4",
             latitude: 35.6594945,
@@ -102,13 +113,13 @@ extension Record {
             rating: 4.5,
             note: "野菜マシマシで最高だった！また来たい。",
             companions: ["友人"],
-            photoKeys: ["photos/user001/rec001/1.jpg"],
+            thumbnailUrl: nil,
+            photos: nil,
             createdAt: Date().addingTimeInterval(-86400 * 3),
             updatedAt: Date().addingTimeInterval(-86400 * 3)
         ),
         Record(
             id: "rec002",
-            userId: "user001",
             storeName: "スターバックス 新宿南口店",
             placeId: nil,
             latitude: 35.6896342,
@@ -118,13 +129,13 @@ extension Record {
             rating: 4.0,
             note: "新作フラペチーノを試した",
             companions: [],
-            photoKeys: ["photos/user001/rec002/1.jpg"],
+            thumbnailUrl: nil,
+            photos: nil,
             createdAt: Date().addingTimeInterval(-86400 * 7),
             updatedAt: Date().addingTimeInterval(-86400 * 7)
         ),
         Record(
             id: "rec003",
-            userId: "user001",
             storeName: "焼肉きんぐ 目黒店",
             placeId: nil,
             latitude: 35.6332635,
@@ -134,7 +145,8 @@ extension Record {
             rating: 5.0,
             note: "食べ放題最高！家族で大満足。",
             companions: ["家族"],
-            photoKeys: ["photos/user001/rec003/1.jpg", "photos/user001/rec003/2.jpg"],
+            thumbnailUrl: nil,
+            photos: nil,
             createdAt: Date().addingTimeInterval(-86400 * 14),
             updatedAt: Date().addingTimeInterval(-86400 * 14)
         )

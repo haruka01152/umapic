@@ -19,7 +19,7 @@ struct RecordDetailView: View {
         ScrollView {
             VStack(spacing: 0) {
                 // 写真カルーセル
-                PhotoCarouselView(photoKeys: record.photoKeys)
+                PhotoCarouselView(photos: record.photos ?? [], thumbnailUrl: record.thumbnailUrl)
                     .frame(height: 300)
 
                 VStack(alignment: .leading, spacing: 20) {
@@ -162,12 +162,13 @@ struct RecordDetailView: View {
 
 // MARK: - Components
 struct PhotoCarouselView: View {
-    let photoKeys: [String]
+    let photos: [Photo]
+    let thumbnailUrl: String?
     @State private var currentPage = 0
 
     var body: some View {
         TabView(selection: $currentPage) {
-            if photoKeys.isEmpty {
+            if photos.isEmpty && thumbnailUrl == nil {
                 Rectangle()
                     .fill(Color.pompomYellow.opacity(0.3))
                     .overlay {
@@ -176,9 +177,9 @@ struct PhotoCarouselView: View {
                             .foregroundStyle(Color.pompomBrown.opacity(0.5))
                     }
                     .tag(0)
-            } else {
-                ForEach(photoKeys.indices, id: \.self) { index in
-                    AsyncImage(url: nil) { image in
+            } else if !photos.isEmpty {
+                ForEach(photos.indices, id: \.self) { index in
+                    AsyncImage(url: URL(string: photos[index].originalUrl)) { image in
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -192,6 +193,20 @@ struct PhotoCarouselView: View {
                     }
                     .tag(index)
                 }
+            } else if let thumbnailUrl = thumbnailUrl, let url = URL(string: thumbnailUrl) {
+                AsyncImage(url: url) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.pompomYellow.opacity(0.3))
+                        .overlay {
+                            ProgressView()
+                                .tint(Color.pompomBrown)
+                        }
+                }
+                .tag(0)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .automatic))

@@ -9,8 +9,8 @@ final class APIClient {
     private let decoder: JSONDecoder
 
     private init() {
-        // TODO: 環境に応じてURLを切り替え
-        baseURL = URL(string: "https://api.umapic.app/v1")!
+        // AWS API Gateway endpoint
+        baseURL = URL(string: "https://6yeb92jo2f.execute-api.ap-northeast-1.amazonaws.com/v1")!
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
