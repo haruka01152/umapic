@@ -5,11 +5,11 @@ struct SearchView: View {
     @State private var searchQuery = ""
     @State private var isSearching = false
 
-    private let allRecords = Record.mockRecords
+    let records: [Record]
 
     // 日付の新しい順でソートした全投稿
     private var sortedRecords: [Record] {
-        allRecords.sorted { $0.visitDate > $1.visitDate }
+        records.sorted { $0.visitDate > $1.visitDate }
     }
 
     // 検索結果（検索クエリがある場合はフィルタリング）
@@ -129,13 +129,20 @@ struct SearchResultRow: View {
     var body: some View {
         HStack(spacing: 12) {
             // サムネイル
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.pompomYellow.opacity(0.3))
-                .frame(width: 60, height: 60)
-                .overlay {
-                    Image(systemName: "photo")
-                        .foregroundStyle(Color.pompomBrown.opacity(0.5))
-                }
+            AsyncImage(url: record.thumbnailUrl.flatMap { URL(string: $0) }) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.pompomYellow.opacity(0.3))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(Color.pompomBrown.opacity(0.5))
+                    }
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(record.storeName)
@@ -163,5 +170,5 @@ struct SearchResultRow: View {
 }
 
 #Preview {
-    SearchView()
+    SearchView(records: [])
 }

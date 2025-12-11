@@ -333,7 +333,7 @@ struct MapThumbnailPin: View {
     var body: some View {
         VStack(spacing: 0) {
             // 円形サムネイル
-            AsyncImage(url: nil) { image in
+            AsyncImage(url: record.thumbnailUrl.flatMap { URL(string: $0) }) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -385,7 +385,7 @@ struct RecordPopupView: View {
     var body: some View {
         HStack(spacing: 12) {
             // サムネイル
-            AsyncImage(url: nil) { image in
+            AsyncImage(url: record.thumbnailUrl.flatMap { URL(string: $0) }) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -475,7 +475,7 @@ struct SearchResultRecordRow: View {
     var body: some View {
         HStack(spacing: 10) {
             // サムネイル
-            AsyncImage(url: nil) { image in
+            AsyncImage(url: record.thumbnailUrl.flatMap { URL(string: $0) }) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Rectangle()

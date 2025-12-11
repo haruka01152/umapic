@@ -39,16 +39,12 @@ final class HomeViewModel: ObservableObject {
         error = nil
 
         do {
-            // TODO: 実際のAPI呼び出し
-            // let response = try await apiClient.fetchRecords(sort: selectedSort)
-            // allRecords = response.records
-
-            // モックデータを使用
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5秒待機
-            allRecords = Record.mockRecords
+            let response = try await apiClient.fetchRecords()
+            allRecords = response.records
             records = sortedRecords(allRecords)
         } catch {
             self.error = error
+            print("Failed to load records: \(error)")
         }
 
         isLoading = false
@@ -61,14 +57,12 @@ final class HomeViewModel: ObservableObject {
 
     func deleteRecord(_ record: Record) async {
         do {
-            // TODO: 実際のAPI呼び出し
-            // try await apiClient.deleteRecord(recordId: record.id)
-
-            // モックでは即座に削除
+            try await apiClient.deleteRecord(id: record.id)
             allRecords.removeAll { $0.id == record.id }
             records = sortedRecords(allRecords)
         } catch {
             self.error = error
+            print("Failed to delete record: \(error)")
         }
     }
 

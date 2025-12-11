@@ -47,6 +47,7 @@ struct Record: Identifiable, Codable, Equatable, Hashable {
 }
 
 struct Photo: Codable, Equatable {
+    let key: String?  // S3キー（編集時に必要）
     let originalUrl: String
     let thumbnailUrl: String
 }
@@ -99,56 +100,23 @@ extension Record {
     }
 }
 
-// MARK: - Mock Data
+#if DEBUG
 extension Record {
-    static let mockRecords: [Record] = [
-        Record(
-            id: "rec001",
-            storeName: "ラーメン二郎 渋谷店",
-            placeId: "ChIJN1t_tDeuEmsRUsoyG83frY4",
-            latitude: 35.6594945,
-            longitude: 139.7005536,
-            address: "東京都渋谷区道玄坂1-2-3",
-            visitDate: Date().addingTimeInterval(-86400 * 3),
-            rating: 4.5,
-            note: "野菜マシマシで最高だった！また来たい。",
-            companions: ["友人"],
-            thumbnailUrl: nil,
-            photos: nil,
-            createdAt: Date().addingTimeInterval(-86400 * 3),
-            updatedAt: Date().addingTimeInterval(-86400 * 3)
-        ),
-        Record(
-            id: "rec002",
-            storeName: "スターバックス 新宿南口店",
-            placeId: nil,
-            latitude: 35.6896342,
-            longitude: 139.6994286,
-            address: "東京都新宿区西新宿1-1-1",
-            visitDate: Date().addingTimeInterval(-86400 * 7),
-            rating: 4.0,
-            note: "新作フラペチーノを試した",
-            companions: [],
-            thumbnailUrl: nil,
-            photos: nil,
-            createdAt: Date().addingTimeInterval(-86400 * 7),
-            updatedAt: Date().addingTimeInterval(-86400 * 7)
-        ),
-        Record(
-            id: "rec003",
-            storeName: "焼肉きんぐ 目黒店",
-            placeId: nil,
-            latitude: 35.6332635,
-            longitude: 139.7156229,
-            address: "東京都目黒区自由が丘1-2-3",
-            visitDate: Date().addingTimeInterval(-86400 * 14),
-            rating: 5.0,
-            note: "食べ放題最高！家族で大満足。",
-            companions: ["家族"],
-            thumbnailUrl: nil,
-            photos: nil,
-            createdAt: Date().addingTimeInterval(-86400 * 14),
-            updatedAt: Date().addingTimeInterval(-86400 * 14)
-        )
-    ]
+    static let previewSample = Record(
+        id: "preview001",
+        storeName: "サンプル店舗",
+        placeId: nil,
+        latitude: 35.6812,
+        longitude: 139.7671,
+        address: "東京都千代田区",
+        visitDate: Date(),
+        rating: 4.0,
+        note: "プレビュー用サンプル",
+        companions: [],
+        thumbnailUrl: nil,
+        photos: nil,
+        createdAt: Date(),
+        updatedAt: nil
+    )
 }
+#endif

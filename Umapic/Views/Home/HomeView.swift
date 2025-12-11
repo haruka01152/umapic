@@ -64,7 +64,7 @@ struct HomeView: View {
                 }
             }
             .sheet(isPresented: $viewModel.showSearch) {
-                SearchView()
+                SearchView(records: viewModel.records)
             }
         }
         .task {

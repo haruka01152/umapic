@@ -13,6 +13,18 @@ struct PhotoItem: Identifiable, Equatable {
     }
 }
 
+// 既存写真（編集時用）
+struct ExistingPhoto: Identifiable, Equatable {
+    let id = UUID()
+    let key: String  // S3キー（保存時に必要）
+    let originalUrl: String
+    let thumbnailUrl: String
+
+    static func == (lhs: ExistingPhoto, rhs: ExistingPhoto) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 @MainActor
 final class RecordCreateViewModel: ObservableObject {
     @Published var selectedPhotos: [PhotosPickerItem] = [] {
@@ -24,7 +36,9 @@ final class RecordCreateViewModel: ObservableObject {
             }
         }
     }
-    @Published var photoItems: [PhotoItem] = []  // 並び替え可能な統合リスト
+    @Published var photoItems: [PhotoItem] = []  // 並び替え可能な統合リスト（新規追加用）
+    @Published var existingPhotos: [ExistingPhoto] = []  // 既存の写真（編集時用）
+    @Published var isLoadingExistingPhotos = false
     @Published var storeName: String?
     @Published var placeId: String?
     @Published var latitude: Double?
@@ -52,9 +66,13 @@ final class RecordCreateViewModel: ObservableObject {
         latitude != nil && longitude != nil
     }
 
+    var totalPhotoCount: Int {
+        existingPhotos.count + photoItems.count
+    }
+
     var isValid: Bool {
-        // 画像が1枚以上あれば保存可能
-        return !photoItems.isEmpty
+        // 画像が1枚以上あれば保存可能（既存 + 新規）
+        return totalPhotoCount > 0
     }
 
     var hasChanges: Bool {
@@ -97,6 +115,11 @@ final class RecordCreateViewModel: ObservableObject {
             rating = record.rating
             note = record.note ?? ""
             companions = record.companions
+
+            // 既存画像を読み込む
+            Task {
+                await loadExistingPhotos(recordId: record.id)
+            }
         } else if let place = initialPlace {
             // 新規作成で場所が指定されている場合
             storeName = place.name
@@ -105,6 +128,29 @@ final class RecordCreateViewModel: ObservableObject {
             longitude = place.longitude
             address = place.address
         }
+    }
+
+    // 既存画像を読み込む（編集時）
+    func loadExistingPhotos(recordId: String) async {
+        isLoadingExistingPhotos = true
+        do {
+            let record = try await apiClient.fetchRecord(id: recordId)
+            if let photos = record.photos {
+                existingPhotos = photos.compactMap { photo in
+                    guard let key = photo.key else { return nil }
+                    return ExistingPhoto(key: key, originalUrl: photo.originalUrl, thumbnailUrl: photo.thumbnailUrl)
+                }
+            }
+        } catch {
+            print("Failed to load existing photos: \(error)")
+        }
+        isLoadingExistingPhotos = false
+    }
+
+    // 既存画像を削除
+    func removeExistingPhoto(at index: Int) {
+        guard index < existingPhotos.count else { return }
+        existingPhotos.remove(at: index)
     }
 
     // カメラで撮影した画像を追加
@@ -143,7 +189,7 @@ final class RecordCreateViewModel: ObservableObject {
     func loadNewLibraryImages() async {
         print("📷 loadNewLibraryImages called, selectedPhotos.count = \(selectedPhotos.count)")
 
-        let currentCount = photoItems.count
+        let currentCount = totalPhotoCount
         let remainingSlots = 5 - currentCount
 
         // 追加できる枚数分だけ処理
@@ -174,25 +220,42 @@ final class RecordCreateViewModel: ObservableObject {
         isSaving = true
 
         do {
-            // 写真のアップロード
-            var photoKeys: [String] = []
+            // 既存画像のキーを取得
+            var photoKeys: [String] = existingPhotos.map { $0.key }
 
+            // 新規画像のアップロード
             if !photoItems.isEmpty {
                 // カメラロールに保存する場合
                 if saveToCameraRoll {
                     await saveToCameraRollIfNeeded()
                 }
 
-                // TODO: 署名付きURL取得 & アップロード
-                // photoItemsを順番にアップロード
-                // let urlResponse = try await apiClient.getUploadURLs(count: photoItems.count)
-                // ...
+                // 署名付きURL取得 & アップロード
+                let urlResponse = try await apiClient.getUploadURLs(count: photoItems.count)
+
+                for (index, uploadInfo) in urlResponse.uploadUrls.enumerated() {
+                    guard index < photoItems.count,
+                          let imageData = photoItems[index].image.jpegData(compressionQuality: 0.8),
+                          let uploadUrl = URL(string: uploadInfo.uploadUrl) else {
+                        continue
+                    }
+
+                    try await apiClient.uploadImage(data: imageData, to: uploadUrl)
+                    photoKeys.append(uploadInfo.key)
+                }
             }
 
             if isEditing {
                 // 更新
-                // let request = UpdateRecordRequest(...)
-                // try await apiClient.updateRecord(id: editingRecord!.id, request: request)
+                var request = UpdateRecordRequest()
+                request.storeName = storeName
+                request.visitDate = Record.simpleDateFormatter.string(from: visitDate)
+                request.rating = rating > 0 ? rating : nil
+                request.note = note.isEmpty ? nil : note
+                request.companions = companions
+                // 既存画像のキー + 新規画像のキーを送信
+                request.photoKeys = photoKeys
+                _ = try await apiClient.updateRecord(id: editingRecord!.id, request)
             } else {
                 // 新規作成
                 let request = CreateRecordRequest(
@@ -207,8 +270,8 @@ final class RecordCreateViewModel: ObservableObject {
                     companions: companions,
                     photoKeys: photoKeys
                 )
-                // try await apiClient.createRecord(request: request)
-                print("Creating record: \(request)")
+                _ = try await apiClient.createRecord(request)
+                print("Record created successfully")
             }
         } catch {
             print("Save error: \(error)")

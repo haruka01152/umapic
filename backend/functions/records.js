@@ -1,10 +1,23 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, QueryCommand, PutCommand, GetCommand, UpdateCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { ulid } = require('ulid');
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
+const s3Client = new S3Client({});
 const TABLE_NAME = process.env.TABLE_NAME;
+const BUCKET_NAME = process.env.BUCKET_NAME;
+
+// S3署名付きURL生成（読み取り用）
+const getReadUrl = async (key) => {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+  return getSignedUrl(s3Client, command, { expiresIn: 3600 });
+};
 
 // ヘルパー関数
 const getUserId = (event) => {
@@ -61,20 +74,29 @@ exports.listRecords = async (event) => {
       ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
       : null;
 
+    // 署名付きURLを生成
+    const recordsWithUrls = await Promise.all(records.map(async (r) => {
+      let thumbnailUrl = null;
+      if (r.photoKeys?.[0]) {
+        thumbnailUrl = await getReadUrl(r.photoKeys[0]);
+      }
+      return {
+        recordId: r.recordId,
+        storeName: r.storeName,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        visitDate: r.visitDate,
+        rating: r.rating,
+        note: r.note,
+        companions: r.companions || [],
+        thumbnailUrl,
+        createdAt: r.createdAt,
+      };
+    }));
+
     return response(200, {
       data: {
-        records: records.map(r => ({
-          recordId: r.recordId,
-          storeName: r.storeName,
-          latitude: r.latitude,
-          longitude: r.longitude,
-          visitDate: r.visitDate,
-          rating: r.rating,
-          note: r.note,
-          companions: r.companions || [],
-          thumbnailUrl: r.photoKeys?.[0] ? `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${r.photoKeys[0]}` : null,
-          createdAt: r.createdAt,
-        })),
+        records: recordsWithUrls,
         nextCursor,
         hasMore: !!result.LastEvaluatedKey,
       },
@@ -152,6 +174,14 @@ exports.getRecord = async (event) => {
     }
 
     const r = result.Item;
+
+    // 署名付きURLを生成
+    const photos = await Promise.all((r.photoKeys || []).map(async (key) => ({
+      key: key,  // S3キーを返す（編集時に必要）
+      originalUrl: await getReadUrl(key),
+      thumbnailUrl: await getReadUrl(key), // サムネイルは同じ画像を使用（将来的にはリサイズ版を生成）
+    })));
+
     return response(200, {
       data: {
         recordId: r.recordId,
@@ -164,10 +194,7 @@ exports.getRecord = async (event) => {
         rating: r.rating,
         note: r.note,
         companions: r.companions || [],
-        photos: (r.photoKeys || []).map(key => ({
-          originalUrl: `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${key}`,
-          thumbnailUrl: `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${key.replace('/original/', '/thumbnail/')}`,
-        })),
+        photos,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
       },

@@ -115,17 +115,22 @@ struct RecordCreateView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("保存") {
-                        Task {
-                            await viewModel.save()
-                            let isEditing = viewModel.isEditing
-                            dismiss()
-                            onSave?(isEditing)
-                            appState.showToast(message: isEditing ? "更新しました" : "投稿しました")
+                    if viewModel.isSaving {
+                        ProgressView()
+                            .tint(Color.pompomBrown)
+                    } else {
+                        Button("保存") {
+                            Task {
+                                await viewModel.save()
+                                let isEditing = viewModel.isEditing
+                                dismiss()
+                                onSave?(isEditing)
+                                appState.showToast(message: isEditing ? "更新しました" : "投稿しました")
+                            }
                         }
+                        .disabled(!viewModel.isValid || viewModel.isSaving)
+                        .fontWeight(.semibold)
                     }
-                    .disabled(!viewModel.isValid)
-                    .fontWeight(.semibold)
                 }
 
                 ToolbarItemGroup(placement: .keyboard) {
@@ -168,7 +173,17 @@ struct PhotoPickerView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            if viewModel.photoItems.isEmpty {
+            if viewModel.isLoadingExistingPhotos {
+                HStack {
+                    ProgressView()
+                        .tint(Color.pompomBrown)
+                    Text("画像を読み込み中...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 120)
+            } else if viewModel.totalPhotoCount == 0 {
                 Button(action: {
                     showActionSheet = true
                 }) {
@@ -193,11 +208,17 @@ struct PhotoPickerView: View {
                 .buttonStyle(.plain)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("長押しでドラッグして順番を変更")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if !viewModel.existingPhotos.isEmpty && viewModel.photoItems.isEmpty {
+                        Text("既存の画像")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if !viewModel.photoItems.isEmpty {
+                        Text("長押しでドラッグして順番を変更")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
-                    ReorderablePhotoGrid(viewModel: viewModel, onAddMore: {
+                    CombinedPhotoGrid(viewModel: viewModel, onAddMore: {
                         showActionSheet = true
                     })
                 }
@@ -220,9 +241,122 @@ struct PhotoPickerView: View {
         .photosPicker(
             isPresented: $showPhotoPicker,
             selection: $viewModel.selectedPhotos,
-            maxSelectionCount: max(1, 5 - viewModel.photoItems.count),
+            maxSelectionCount: max(1, 5 - viewModel.totalPhotoCount),
             matching: .images
         )
+    }
+}
+
+// MARK: - Combined Photo Grid (既存画像 + 新規画像)
+struct CombinedPhotoGrid: View {
+    @ObservedObject var viewModel: RecordCreateViewModel
+    let onAddMore: () -> Void
+    private let itemSize: CGFloat = 100
+
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    // 既存画像
+                    ForEach(Array(viewModel.existingPhotos.enumerated()), id: \.element.id) { index, photo in
+                        ExistingPhotoThumbnailView(
+                            photo: photo,
+                            isFirst: index == 0 && viewModel.photoItems.isEmpty,
+                            onDelete: {
+                                withAnimation {
+                                    viewModel.removeExistingPhoto(at: index)
+                                }
+                            }
+                        )
+                    }
+
+                    // 新規画像
+                    ForEach(Array(viewModel.photoItems.enumerated()), id: \.element.id) { index, item in
+                        PhotoThumbnailView(
+                            item: item,
+                            isFirst: index == 0 && viewModel.existingPhotos.isEmpty,
+                            isDragging: false,
+                            onDelete: {
+                                withAnimation {
+                                    viewModel.removePhotoItem(at: index)
+                                }
+                            }
+                        )
+                    }
+
+                    // 追加ボタン
+                    if viewModel.totalPhotoCount < 5 {
+                        Button(action: onAddMore) {
+                            VStack {
+                                Image(systemName: "plus")
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(width: itemSize, height: itemSize)
+                            .background(Color(.systemGray6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+                .padding(.trailing, 8)
+            }
+        }
+        .frame(height: 120)
+    }
+}
+
+// MARK: - Existing Photo Thumbnail View
+struct ExistingPhotoThumbnailView: View {
+    let photo: ExistingPhoto
+    let isFirst: Bool
+    let onDelete: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            AsyncImage(url: URL(string: photo.thumbnailUrl)) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.pompomYellow.opacity(0.3))
+                    .overlay {
+                        ProgressView()
+                            .tint(Color.pompomBrown)
+                    }
+            }
+            .frame(width: 100, height: 100)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isFirst ? Color.pompomYellow : Color.clear, lineWidth: 3)
+            )
+
+            // サムネイルバッジ（先頭の画像のみ）
+            if isFirst {
+                Text("サムネイル")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Color.pompomText)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.pompomYellow)
+                    .clipShape(Capsule())
+                    .padding(.top, 4)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+
+            // 削除ボタン
+            Button(action: onDelete) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.white)
+                    .background(Circle().fill(Color.pompomBrown.opacity(0.7)))
+            }
+            .padding(.top, 4)
+            .padding(.trailing, -4)
+        }
+        .frame(width: 100, height: 100)
     }
 }
 

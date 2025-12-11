@@ -30,7 +30,7 @@ struct RecordGridItem: View {
 
     var body: some View {
         GeometryReader { geometry in
-            AsyncImage(url: nil) { image in
+            AsyncImage(url: record.thumbnailUrl.flatMap { URL(string: $0) }) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -84,7 +84,7 @@ struct RecordGridItem: View {
 
 #Preview {
     NavigationStack {
-        RecordGridView(records: Record.mockRecords) { _ in }
+        RecordGridView(records: [Record.previewSample]) { _ in }
     }
     .environmentObject(AppState())
 }

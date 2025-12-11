@@ -2,16 +2,22 @@ import SwiftUI
 import MapKit
 
 struct RecordDetailView: View {
-    let record: Record
+    let initialRecord: Record
     let onDelete: ((Record) async -> Void)?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
     @State private var showingEditSheet = false
     @State private var showingDeleteAlert = false
     @State private var isDeleting = false
+    @State private var detailedRecord: Record?
+    @State private var isLoadingDetails = false
+
+    private var record: Record {
+        detailedRecord ?? initialRecord
+    }
 
     init(record: Record, onDelete: ((Record) async -> Void)? = nil) {
-        self.record = record
+        self.initialRecord = record
         self.onDelete = onDelete
     }
 
@@ -139,6 +145,20 @@ struct RecordDetailView: View {
                     .tint(.white)
             }
         }
+        .task {
+            await loadDetailedRecord()
+        }
+    }
+
+    private func loadDetailedRecord() async {
+        guard detailedRecord == nil else { return }
+        isLoadingDetails = true
+        do {
+            detailedRecord = try await APIClient.shared.fetchRecord(id: initialRecord.id)
+        } catch {
+            print("Failed to load record details: \(error)")
+        }
+        isLoadingDetails = false
     }
 
     private func openInMaps() {
@@ -262,7 +282,7 @@ struct DetailRow: View {
 
 #Preview {
     NavigationStack {
-        RecordDetailView(record: Record.mockRecords[0]) { _ in }
+        RecordDetailView(record: Record.previewSample) { _ in }
     }
     .environmentObject(AppState())
 }

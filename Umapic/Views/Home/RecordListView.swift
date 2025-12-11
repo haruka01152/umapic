@@ -40,7 +40,7 @@ struct RecordListItem: View {
     var body: some View {
         HStack(spacing: 12) {
             // サムネイル
-            AsyncImage(url: nil) { image in
+            AsyncImage(url: record.thumbnailUrl.flatMap { URL(string: $0) }) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -117,7 +117,7 @@ struct RatingBadge: View {
 
 #Preview {
     NavigationStack {
-        RecordListView(records: Record.mockRecords) { _ in }
+        RecordListView(records: [Record.previewSample]) { _ in }
     }
     .environmentObject(AppState())
 }

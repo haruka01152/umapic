@@ -160,13 +160,8 @@ final class MapViewModel: NSObject, ObservableObject {
         error = nil
 
         do {
-            // TODO: 実際のAPI呼び出し
-            // let response = try await apiClient.fetchRecords()
-            // records = response.records
-
-            // モックデータを使用
-            try await Task.sleep(nanoseconds: 500_000_000)
-            records = Record.mockRecords
+            let response = try await apiClient.fetchRecords()
+            records = response.records
 
             // 現在地にセンタリング済みでない場合のみ、記録に合わせてカメラを調整
             // （現在地が取得できている場合は現在地を優先）
@@ -175,6 +170,7 @@ final class MapViewModel: NSObject, ObservableObject {
             }
         } catch {
             self.error = error
+            print("Failed to load records: \(error)")
         }
 
         isLoading = false
